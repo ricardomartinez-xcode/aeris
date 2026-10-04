@@ -4,7 +4,7 @@ import { Redis } from "@upstash/redis";
 
 const prefix = process.env.ASTRAEA_REDIS_PREFIX || "astraea:v1";
 const allowedNodes = new Set(
-  (process.env.ASTRAEA_DURABLE_NODES || "papeleria,latitude,maquina-01,maquina-02,maquina-03")
+  (process.env.ASTRAEA_DURABLE_NODES || "auto,papeleria,latitude,maquina-01,maquina-02,maquina-03")
     .split(",").map(x => x.trim()).filter(Boolean)
 );
 const allowedTools = new Set(
@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       service: "astraea-job-gateway",
-      version: "0.1.8"
+      version: "0.2.0"
     });
   }
 
@@ -55,7 +55,9 @@ export default async function handler(req, res) {
     await receiver.verify({
       signature,
       body: rawText,
-      upstashRegion: typeof req.headers["upstash-region"] === "string" ? req.headers["upstash-region"] : undefined,
+      upstashRegion: typeof req.headers["upstash-region"] === "string"
+        ? req.headers["upstash-region"]
+        : undefined,
       clockTolerance: 5
     });
   } catch (error) {
@@ -78,17 +80,33 @@ export default async function handler(req, res) {
 
   const jobId = String(job.job_id || "");
   const traceId = String(job.trace_id || jobId);
-  const nodeId = String(job.node_id || "");
+  const nodeId = String(job.node_id || "auto");
   const tool = String(job.tool || "");
+  const priorityRaw = String(job.priority || "normal").toLowerCase();
+  const priority = ["high", "normal", "low"].includes(priorityRaw) ? priorityRaw : "normal";
+  const role = job.role == null ? null : String(job.role);
+  const capabilityRequired = String(job.capability_required || tool || "terminal_exec");
+  const deadline = job.deadline == null ? null : Number(job.deadline);
+  const jobType = String(job.job_type || "tool");
+  const createdBy = String(job.created_by || "qstash").slice(0, 128);
   const args = job.arguments && typeof job.arguments === "object" && !Array.isArray(job.arguments)
     ? job.arguments : {};
 
-  if (!validId(jobId) || !validId(traceId) || !validId(nodeId) || !validId(tool)) {
+  if (
+    !validId(jobId) ||
+    !validId(traceId) ||
+    !validId(nodeId) ||
+    !validId(tool) ||
+    !validId(capabilityRequired) ||
+    !validId(jobType)
+  ) {
     return res.status(400).json({ ok: false, error: "invalid_job_identity" });
   }
+
   if (!allowedNodes.has(nodeId)) {
     return res.status(403).json({ ok: false, error: "node_not_allowed" });
   }
+
   if (!allowedTools.has(tool)) {
     return res.status(403).json({ ok: false, error: "tool_not_allowed" });
   }
@@ -101,9 +119,16 @@ export default async function handler(req, res) {
 
   const now = Date.now();
   const record = {
+    schema_version: 2,
+    job_type: jobType,
+    priority,
     job_id: jobId,
     trace_id: traceId,
     node_id: nodeId,
+    role,
+    capability_required: capabilityRequired,
+    created_by: createdBy,
+    deadline: Number.isFinite(deadline) ? deadline : null,
     tool,
     arguments: args,
     lock_key: typeof job.lock_key === "string" ? job.lock_key.slice(0, 256) : null,
@@ -114,10 +139,18 @@ export default async function handler(req, res) {
   };
 
   try {
-    await redis.set(`${prefix}:job:${jobId}`, JSON.stringify(record), { ex: 86400 });
-    await redis.rpush(`${prefix}:queue:durable`, JSON.stringify(record));
-    return res.status(202).json({ ok: true, queued: true, job_id: jobId, trace_id: traceId });
-  } catch (error) {
+    const encoded = JSON.stringify(record);
+    await redis.set(`${prefix}:job:${jobId}`, encoded, { ex: 86400 });
+    await redis.rpush(`${prefix}:queue:durable:${priority}`, encoded);
+    return res.status(202).json({
+      ok: true,
+      queued: true,
+      priority,
+      node_id: nodeId,
+      job_id: jobId,
+      trace_id: traceId
+    });
+  } catch {
     await redis.del(submitKey);
     return res.status(503).json({ ok: false, error: "queue_unavailable" });
   }
