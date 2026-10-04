@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       service: "astraea-job-gateway",
-      version: "0.1.3",
+      version: "0.1.4",
       diagnostics: req.query?.diag === "1" ? {
         current: fp(process.env.QSTASH_CURRENT_SIGNING_KEY),
         next: fp(process.env.QSTASH_NEXT_SIGNING_KEY)
