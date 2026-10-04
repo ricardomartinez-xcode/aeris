@@ -1,4 +1,5 @@
 import getRawBody from "raw-body";
+import { createHash } from "crypto";
 import { Receiver } from "@upstash/qstash";
 import { Redis } from "@upstash/redis";
 
@@ -31,10 +32,15 @@ function validId(value, max = 128) {
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
+    const fp = (v) => v ? createHash("sha256").update(String(v)).digest("hex").slice(0,16) : null;
     return res.status(200).json({
       ok: true,
       service: "astraea-job-gateway",
-      version: "0.1.2"
+      version: "0.1.3",
+      diagnostics: req.query?.diag === "1" ? {
+        current: fp(process.env.QSTASH_CURRENT_SIGNING_KEY),
+        next: fp(process.env.QSTASH_NEXT_SIGNING_KEY)
+      } : undefined
     });
   }
 
