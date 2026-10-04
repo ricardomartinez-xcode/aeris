@@ -31,23 +31,10 @@ function validId(value, max = 128) {
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
-    const fp = (v) => {
-      if (!v) return null;
-      let h = 2166136261 >>> 0;
-      for (let i = 0; i < String(v).length; i++) {
-        h ^= String(v).charCodeAt(i);
-        h = Math.imul(h, 16777619) >>> 0;
-      }
-      return h.toString(16).padStart(8, "0");
-    };
     return res.status(200).json({
       ok: true,
       service: "astraea-job-gateway",
-      version: "0.1.4",
-      diagnostics: req.query?.diag === "1" ? {
-        current: fp(process.env.QSTASH_CURRENT_SIGNING_KEY),
-        next: fp(process.env.QSTASH_NEXT_SIGNING_KEY)
-      } : undefined
+      version: "0.1.5"
     });
   }
 
