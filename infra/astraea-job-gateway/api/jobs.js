@@ -59,7 +59,14 @@ export default async function handler(req, res) {
       upstashRegion: typeof req.headers["upstash-region"] === "string" ? req.headers["upstash-region"] : undefined,
       clockTolerance: 5
     });
-  } catch {
+  } catch (error) {
+    console.error("qstash_verify_failed", {
+      message: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : "unknown",
+      region: typeof req.headers["upstash-region"] === "string" ? req.headers["upstash-region"] : null,
+      host: req.headers.host || null,
+      body_length: rawText.length
+    });
     return res.status(401).json({ ok: false, error: "invalid_signature" });
   }
 
