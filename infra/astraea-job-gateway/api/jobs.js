@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       service: "astraea-job-gateway",
-      version: "0.1.6",
+      version: "0.1.7",
       diagnostics: req.query?.diag === "1" ? {
         redis_url: fp(process.env.UPSTASH_REDIS_REST_URL),
         redis_token: fp(process.env.UPSTASH_REDIS_REST_TOKEN)
