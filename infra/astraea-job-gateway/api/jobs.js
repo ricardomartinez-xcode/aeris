@@ -55,7 +55,6 @@ export default async function handler(req, res) {
     await receiver.verify({
       signature,
       body: rawText,
-      url: "https://astraea-job-gateway.vercel.app/api/jobs",
       upstashRegion: typeof req.headers["upstash-region"] === "string" ? req.headers["upstash-region"] : undefined,
       clockTolerance: 5
     });
