@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       service: "astraea-job-gateway",
-      version: "0.2.0"
+      version: "0.2.1"
     });
   }
 
@@ -107,6 +107,10 @@ export default async function handler(req, res) {
     return res.status(403).json({ ok: false, error: "node_not_allowed" });
   }
 
+  if (role !== null && !["worker", "broker", "headless-worker", "interactive-agent"].includes(role)) {
+    return res.status(400).json({ ok: false, error: "invalid_role" });
+  }
+
   if (!allowedTools.has(tool)) {
     return res.status(403).json({ ok: false, error: "tool_not_allowed" });
   }
@@ -142,6 +146,20 @@ export default async function handler(req, res) {
     const encoded = JSON.stringify(record);
     await redis.set(`${prefix}:job:${jobId}`, encoded, { ex: 86400 });
     await redis.rpush(`${prefix}:queue:durable:${priority}`, encoded);
+    try {
+      const event = JSON.stringify({
+        time: Date.now() / 1000,
+        kind: "job.accepted",
+        trace_id: traceId,
+        job_id: jobId,
+        node_id: nodeId,
+        data: { priority, role, capability_required: capabilityRequired }
+      });
+      await redis.lpush(`${prefix}:events`, event);
+      await redis.ltrim(`${prefix}:events`, 0, 4999);
+    } catch {
+      // Event logging is best-effort; accepting the durable job must not depend on telemetry.
+    }
     return res.status(202).json({
       ok: true,
       queued: true,
