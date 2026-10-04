@@ -1,0 +1,11 @@
+{
+  "name": "astraea-job-gateway",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@upstash/qstash": "^2.8.3",
+    "@upstash/redis": "^1.35.3",
+    "raw-body": "^3.0.0"
+  }
+}
