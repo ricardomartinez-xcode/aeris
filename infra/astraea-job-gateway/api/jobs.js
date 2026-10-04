@@ -52,7 +52,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    await receiver.verify({ signature, body: rawText, clockTolerance: 5 });
+    await receiver.verify({
+      signature,
+      body: rawText,
+      url: "https://astraea-job-gateway.vercel.app/api/jobs",
+      upstashRegion: typeof req.headers["upstash-region"] === "string" ? req.headers["upstash-region"] : undefined,
+      clockTolerance: 5
+    });
   } catch {
     return res.status(401).json({ ok: false, error: "invalid_signature" });
   }
